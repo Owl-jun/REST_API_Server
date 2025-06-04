@@ -12,6 +12,6 @@ namespace REST_API.DBModel
         public string Phone { get; set; } = "";
         [JsonIgnore] public DateTime Created_At { get; set; } = DateTime.Now;
 
-        public List<Inventory> Inventory { get; set; } = new();
+        [JsonIgnore] public List<Inventory> Inventory { get; set; } = new();
     }
 }
