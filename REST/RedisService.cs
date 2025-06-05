@@ -40,6 +40,7 @@ namespace REST_API
         {
             await _sub.PublishAsync(channel, message);
         }
+
         public async Task Subscribe<T>(string channel, Action<T> handler)
         {
             await _sub.SubscribeAsync(channel, (ch, msg) =>

@@ -7,6 +7,7 @@ using MySqlConnector;
 using REST_API;
 using REST_API.DBModel;
 using REST_API.DTO;
+using REST_API.Helpers;
 using REST_API.LocalCache;
 using StackExchange.Redis;
 using System;
@@ -108,15 +109,13 @@ app.MapGet("/", async (RedisService _redis) =>
 {
     await _redis.DeleteAsync($"user:token:admin");
     return Results.Ok(" GO TO /Swagger");
-});
+})
+.WithSummary("서버 개발자 단위 테스트용 API");
 #endregion
 
 #region UserAPI
-// ---------------------------------------------------------------
-// ------------ USER ---------------------------------------------
 var USER = app.MapGroup("/user");
 
-// REGISTER
 USER.MapPost("/register", async (User user, Dbconn db) =>
 {
     try
@@ -137,15 +136,17 @@ USER.MapPost("/register", async (User user, Dbconn db) =>
     }
     catch (DbUpdateException ex)
     {
-        return Results.Problem("가입 실패" + ex.Message , statusCode: 500);
+        return Results.Problem("가입 실패" + ex.Message, statusCode: 500);
     }
     catch (Exception ex)
     {
-        return Results.Problem("서버 오류" , statusCode: 500);
+        return Results.Problem("서버 오류", statusCode: 500);
     }
 })
 .WithName("RegisterUser")
-.WithTags("Users");
+.WithTags("Users")
+.WithSummary("회원가입요청 API")
+.WithDescription("중복 가입 체크 후 성공 여부를 반환합니다.");
 
 // LOGIN
 USER.MapPost("/login", async (LoginRequest req, Dbconn db, IConfiguration config, RedisService _redis) =>
@@ -153,142 +154,80 @@ USER.MapPost("/login", async (LoginRequest req, Dbconn db, IConfiguration config
     try
     {
         // Check Redis Cache
-        if (await _redis.ExistsAsync($"user:token:{req.Username}"))
+        if (await _redis.ExistsAsync($"user:state:{req.Username}"))
             return Results.Problem("이미 접속 중인 유저입니다.", statusCode: 401);
 
-        // DB Query
         var user = await db.Users.Include(u => u.Inventory)
                                  .ThenInclude(inv => inv.Item)
                                  .FirstOrDefaultAsync(u => u.Username == req.Username);
-        if (user is null)  
-            return Results.Problem("존재하지 않는 사용자입니다.", statusCode: 401); 
-                
+        // DB Query
         if (user is null)
             return Results.Problem("존재하지 않는 사용자입니다.", statusCode: 401);
 
+        // 비밀번호 검증
         bool isValid = BCrypt.Net.BCrypt.Verify(req.Password, user.Password);
-
         if (!isValid)
             return Results.Problem("비밀번호가 일치하지 않습니다.", statusCode: 401);
 
+        // JWT 토큰 발급
+        string token = JwtHelper.GenerateJwtToken(user, config);
 
-        string token = GenerateJwtToken(user, config);
+        // REDIS 캐싱
+        var RedisValue = new UserStateDTO { Token = token, UserId = user.Id, UserName = user.Username };
+        string value = JsonSerializer.Serialize(RedisValue);
+        await _redis.SetAsync($"user:state:{user.Username}", value, TimeSpan.FromHours(1));
 
-        await _redis.SetAsync($"user:token:{user.Username}", token, TimeSpan.FromHours(1));       
+        // 동기화 메시지 전송
+        var msg = new MessageLogDTO { oper = 0, UserState = RedisValue };   // 0 : Login , 1 : Logout
+        string message = JsonSerializer.Serialize(msg);
+        await _redis.Publish("user:state:update", message);
 
-        var inventoryDtos = user.Inventory.Select(i => new InventoryDTO
-        {
-            InventoryId = i.Inventory_Id,
-            Quantity = i.Quantity,
-            AcquiredAt = i.acquired_at,
-            Item = new ItemDTO
-            {
-                ID = i.Item_Id,
-                Name = i.Item?.Name ?? "Unknown",
-                Description = i.Item?.Description ?? "",
-                Type = i.Item?.Type ?? "",
-                Rarity = i.Item?.Rarity ?? ""
-            }
-        }).ToList();
-
-        var userDto = new UserDTO
-        {
-            Id = user.Id,
-            Name = user.Username,
-            Inventory = inventoryDtos
-        };
-
-        var userData = new UserData
-        {
-            Token = token,
-            UserId = user.Id,
-            Inventory = inventoryDtos
-        };
-        string json = JsonSerializer.Serialize(userData);
-        await _redis.Publish("user:login", json);
-
-        return Results.Ok(new
-        {
-            message = "로그인 성공",
-            token = token,
-            user = userDto
-        });
+        return Results.Ok(RedisValue);
     }
     catch (Exception ex)
     {
         return Results.Problem("서버 오류" + ex.Message, statusCode: 500);
     }
-}).WithName("Login")
-  .WithTags("Users");
+})
+.WithName("Login")
+.WithTags("Users")
+.WithSummary("로그인 요청 API")
+.WithDescription("실패시 존재 여부, 비밀번호 불일치, 중복 로그인 여부, 서버 오류 구분하여 리턴합니다.");
 
 // LOGOUT
-USER.MapPost("/logout", async (HttpContext ctx, RedisService _redis) => {
+USER.MapPost("/logout", async (HttpContext ctx, RedisService _redis) =>
+{
     var auth = ctx.Request.Headers["Authorization"].ToString();
-
     if (string.IsNullOrEmpty(auth) || !auth.StartsWith("Bearer "))
         return Results.Problem("유효하지 않은 토큰 형식입니다.", statusCode: 401);
 
     var token = auth["Bearer ".Length..].Trim();
-    var username = ExtractUsernameFromJwt(token);
-
+    var username = JwtHelper.ExtractUsernameFromJwt(token);
     if (username == null)
         return Results.Problem("토큰 파싱 실패", statusCode: 401);
+
     var cached = await _redis.GetAsync($"user:token:{username}");
     if (cached != token)
         return Results.Problem("이미 만료되었거나 유효하지 않은 세션 입니다.", statusCode: 401);
 
-    await _redis.DeleteAsync($"user:token:{username}");
+    await _redis.DeleteAsync($"user:state:{username}");
 
-    var userData = new UserData
-    {
-        Token = token,
-        Inventory = new() 
-    };
-    string json = JsonSerializer.Serialize(userData);
-    await _redis.Publish("user:logout", json);
+    // 동기화 메시지 전송
+    var msg = new MessageLogDTO { oper = 1, UserState = new UserStateDTO { UserName = username } };   // 0 : Login , 1 : Logout
+    string message = JsonSerializer.Serialize(msg);
+    await _redis.Publish("user:state:update", message);
 
     return Results.Ok("로그아웃 성공");
-
-}).WithName("LOGOUT").WithTags("Users");
-// ---------------------------------------------------------------
+})
+.WithName("LOGOUT")
+.WithTags("Users")
+.WithSummary("로그아웃 요청 API")
+.WithDescription("클라이언트 종료시 필수적으로 호출해야하는 API 입니다. (클라이언트 동기화)");
 #endregion
 
 app.Run();
-// ---------------------------------------------------------
-// ---------------------------------------------------------
-// Functions
-#region JWT Function
-string GenerateJwtToken(User user, IConfiguration config)
-{
-    var claims = new[]
-    {
-        new Claim(ClaimTypes.Name, user.Username),
-        new Claim("user_id", user.Id.ToString()),
-        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
-    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-    var token = new JwtSecurityToken(
-        issuer: config["Jwt:Issuer"],
-        audience: config["Jwt:Audience"],
-        claims: claims,
-        expires: DateTime.Now.AddMinutes(double.Parse(config["Jwt:ExpiresInMinutes"]!)),
-        signingCredentials: creds
-    );
-
-    return new JwtSecurityTokenHandler().WriteToken(token);
-};
-string? ExtractUsernameFromJwt(string token)
-{
-    var handler = new JwtSecurityTokenHandler();
-    var jwt = handler.ReadJwtToken(token);
-    return jwt.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
-}
-#endregion
 
 
-// ---------------------------------------------------------
 // ---------------------------------------------------------
 // DTO
 record LoginRequest(string Username, string Password);

@@ -4,7 +4,6 @@ namespace REST_API.DBModel
 {
     public class Inventory
     {
-        public int Inventory_Id { get; set; }
         public int User_Id { get; set; } 
         public int Item_Id { get; set; }
         public int Quantity { get; set; }

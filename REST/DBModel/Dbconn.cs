@@ -7,6 +7,7 @@ namespace REST_API.DBModel
         public DbSet<User> Users => Set<User>();
         public DbSet<Inventory> Inventory => Set<Inventory>();
         public DbSet<Item> Item => Set<Item>();
+
         public Dbconn(DbContextOptions<Dbconn> options) : base(options) { }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -19,7 +20,7 @@ namespace REST_API.DBModel
                 .HasKey(it => it.Item_Id);
 
             modelBuilder.Entity<Inventory>()
-                .HasKey(i => i.Inventory_Id);
+                .HasKey(i => new {i.User_Id, i.Item_Id});
 
             modelBuilder.Entity<Inventory>()
                 .HasOne(i => i.User)
