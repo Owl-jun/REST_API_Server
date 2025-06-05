@@ -33,7 +33,8 @@
    - POST GET PUT DELETE /inventory (인벤토리 관련 요청)
 
 - Redis 연동
-   - 진행중
+   - StackExchange.Redis
+   - Redis CRUD 클래스 생성
    
 - DB 연동
    - Pomelo.EntityFrameworkCore.MySql 
