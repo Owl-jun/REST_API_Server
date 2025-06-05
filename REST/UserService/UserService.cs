@@ -11,12 +11,12 @@ using MySqlConnector;
 
 namespace REST_API.UserService
 {
-
     public class UserService
     {
         private readonly Dbconn _db;
         private readonly RedisService _redis;
         private readonly IConfiguration _config;
+
         public UserService(Dbconn db, RedisService redis, IConfiguration config)
         {
             _db = db;

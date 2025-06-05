@@ -22,6 +22,7 @@ using REST_API.UserService;
 // ---------------------------------------------------------
 // 환경설정
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddScoped<UserService>();
 #region REDIS
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
@@ -160,14 +161,14 @@ USER.MapPost("/logout", async (HttpContext ctx, UserService userService) =>
 
 var INV = app.MapGroup("/inventory");
 
-INV.MapGet("/", async (InvGetRequest UserInfo) =>
-{
+//INV.MapGet("/", async (InvGetRequest UserInfo) =>
+//{
     
-})
-.WithName("LOGOUT")
-.WithTags("Users")
-.WithSummary("로그아웃 요청 API")
-.WithDescription("클라이언트 종료시 필수적으로 호출해야하는 API 입니다. (클라이언트 동기화)"); ;
+//})
+//.WithName("GETINVENTORY")
+//.WithTags("Inventory")
+//.WithSummary("인벤토리 정보 요청 API")
+//.WithDescription("인벤토리 정보를 요청합니다, Body에 UserId , Token을 첨부 해야합니다.");
 
 
 app.Run();
