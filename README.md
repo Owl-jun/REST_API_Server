@@ -57,7 +57,7 @@
 3. **인벤토리(Inventory)**
     - 유저가 보유한 아이템 수량, 획득 시점 등 저장
     - 중간 테이블 역할 (N:M 관계 분리)
-    - User_Id, Item_Id → 외래키 (Composite Key로도 고려 가능)
+    - User_Id, Item_Id → PK : 조합 , **Inventory_Id 삭제**
 
 - 유저 - 아이템 의 관계는 N : M
 - 중간에 인벤토리 테이블을 추가하여 1 : N , M: 1 로 분리
