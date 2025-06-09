@@ -24,9 +24,13 @@
 
 - ASP.NET Core
    - C# 베이스의 비교적 익숙함으로 인해 채택
-   - Minimal API 채택 
+   - ~Minimal API 채택~
+      - ASP.NET Core 사용이 처음 (학습 필요)
       - 실시간성 요구되는 기능 및 게임관련 로직은 대부분 TCP 서버가 책임 
       - UI가 따로 필요하지 않기에 MVC모델 보다 개발 생산성 월등히 높음
+   - Controller 매핑 방식으로 리팩토링
+      - 초기 학습에는 Minimal API가 직관적이고 좋았으나, 확장성을 염두해두고 싶었음.
+      - 어느정도 익숙해진 지금, 더 기능을 추가하기 전에 리팩토링 시작 (250609) 
       
 - RESTful API
    - POST /Login , /Register 구현 (로그인 및 회원가입로직)
