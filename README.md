@@ -93,16 +93,19 @@
 현재 클라이언트 구현이 안 된 상황에서 `insomnia` , 크롬 확장프로그램 등 여러가지 REST API 테스트 툴 후보들이 있었으나, Swagger의 강력한 자동 문서화, 즉시 테스트 가능 및 토큰인증 간편, ASP.NET Core 공식 지원 ... 장점이 매우 커서 선택하게 된 툴. 매우 만족스럽다.
 
 - API 명세서 (/inventory : 구현중)
+  
 ![](https://velog.velcdn.com/images/owljun/post/52d36b7c-e985-4832-99d5-1644c40084a3/image.png)
 
 ---
 
 - 회원가입요청 테스트
+  
 ![](https://velog.velcdn.com/images/owljun/post/d3416e95-4887-4f57-93f5-f4b5a10ba28a/image.png)
 
 ---
 
 - 로그인요청 테스트
+  
 ![](https://velog.velcdn.com/images/owljun/post/3d9809f8-d1b6-45c3-9188-beb87aae82f2/image.png)
 
 
