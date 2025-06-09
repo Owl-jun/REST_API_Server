@@ -8,23 +8,27 @@ using System.Text;
 using REST_API.Common;
 using REST_API.DTO;
 using MySqlConnector;
+using Microsoft.AspNetCore.Mvc;
 
 namespace REST_API.UserService
 {
-    public class UserService
+    [ApiController]
+    [Route("api/[controller]")]
+    public class UserController : ControllerBase
     {
         private readonly Dbconn _db;
         private readonly RedisService _redis;
         private readonly IConfiguration _config;
 
-        public UserService(Dbconn db, RedisService redis, IConfiguration config)
+        public UserController(Dbconn db, RedisService redis, IConfiguration config)
         {
             _db = db;
             _redis = redis;
             _config = config;
         }
 
-        public async Task<(bool Success, string Message)> RegisterAsync(User user)
+        [HttpPost("reg")]
+        public IActionResult RegisterAsync(User user)
         {
             try
             {
@@ -33,25 +37,26 @@ namespace REST_API.UserService
 
                 // DB 저장
                 _db.Users.Add(user);
-                await _db.SaveChangesAsync();
+                _db.SaveChangesAsync();
 
-                return (true, "회원가입 완료");
+                return Ok("회원가입 완료");
             }
             catch (DbUpdateException ex) when (ex.InnerException is MySqlException mysqlEx &&
                                            mysqlEx.Number == 1062) // Duplicate entry
             {
-                return (false,"이미 존재하는 사용자 ID입니다.");
+                return Problem("이미 존재하는 사용자 ID입니다.",statusCode:401);
             }
             catch (DbUpdateException ex)
             {
-                return (false,"가입 실패" + ex.Message);
+                return Problem("가입 실패" + ex.Message, statusCode: 401);
             }
             catch (Exception ex)
             {
-                return (false,"서버 오류");
+                return Problem("서버 오류", statusCode: 401);
             }
         }
 
+        [HttpPost("login")]
         public async Task<(bool Success, string Message, string? Token, UserStateDTO? User)> LoginAsync(LoginRequest req)
         {
             if (await _redis.ExistsAsync($"user:token:{req.Username}"))
@@ -79,6 +84,7 @@ namespace REST_API.UserService
             return (true, "로그인 성공", token, value);
         }
 
+        [HttpPost("logout")]
         public async Task<(bool Success, string Message)> LogoutAsync(HttpContext ctx)
         {
             var auth = ctx.Request.Headers["Authorization"].ToString();
@@ -102,7 +108,6 @@ namespace REST_API.UserService
             await _redis.Publish("user:state:update", message);
 
             return (true, "로그아웃 완료");
-
         }
 
     }
