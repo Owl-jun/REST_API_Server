@@ -1,4 +1,4 @@
-﻿using REST_API.DBModel;
+﻿using REST_API.Entity;
 
 namespace REST_API.DTO
 {

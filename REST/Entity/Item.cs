@@ -1,4 +1,4 @@
-﻿namespace REST_API.DBModel
+﻿namespace REST_API.Entity
 {
     public class Item
     {

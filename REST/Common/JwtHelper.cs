@@ -1,5 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
-using REST_API.DBModel;
+using REST_API.Entity;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;

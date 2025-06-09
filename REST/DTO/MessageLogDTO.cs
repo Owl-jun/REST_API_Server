@@ -1,6 +1,4 @@
-﻿using REST_API.UserService;
-
-namespace REST_API.DTO
+﻿namespace REST_API.DTO
 {
     public class MessageLogDTO
     {

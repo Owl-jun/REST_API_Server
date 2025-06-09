@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using REST_API.DBModel;
+using REST_API.Entity;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text.Json;
@@ -28,7 +28,7 @@ namespace REST_API.UserService
         }
 
         [HttpPost("reg")]
-        public IActionResult RegisterAsync(User user)
+        public async Task<IActionResult> RegisterAsync(User user)
         {
             try
             {
@@ -37,40 +37,40 @@ namespace REST_API.UserService
 
                 // DB 저장
                 _db.Users.Add(user);
-                _db.SaveChangesAsync();
+                await _db.SaveChangesAsync();
 
                 return Ok("회원가입 완료");
             }
             catch (DbUpdateException ex) when (ex.InnerException is MySqlException mysqlEx &&
                                            mysqlEx.Number == 1062) // Duplicate entry
             {
-                return Problem("이미 존재하는 사용자 ID입니다.",statusCode:401);
+                return Problem("이미 존재하는 사용자 ID입니다.",statusCode:409);
             }
             catch (DbUpdateException ex)
             {
-                return Problem("가입 실패" + ex.Message, statusCode: 401);
+                return Problem("가입 실패" + ex.Message, statusCode: 400);
             }
             catch (Exception ex)
             {
-                return Problem("서버 오류", statusCode: 401);
+                return Problem("서버 오류", statusCode: 500);
             }
         }
 
         [HttpPost("login")]
-        public async Task<(bool Success, string Message, string? Token, UserStateDTO? User)> LoginAsync(LoginRequest req)
+        public async Task<ActionResult<UserStateDTO>> LoginAsync(LoginRequestDTO req)
         {
-            if (await _redis.ExistsAsync($"user:token:{req.Username}"))
-                return (false, "이미 접속 중인 유저입니다.", null, null);
+            if (await _redis.ExistsAsync($"user:state:{req.Username}"))
+                return Problem("이미 접속 중인 유저입니다.", statusCode:409 );
 
             var user = await _db.Users.Include(u => u.Inventory)
                                       .ThenInclude(inv => inv.Item)
                                       .FirstOrDefaultAsync(u => u.Username == req.Username);
 
             if (user == null)
-                return (false, "존재하지 않는 사용자입니다.", null, null);
+                return NotFound();
 
             if (!BCrypt.Net.BCrypt.Verify(req.Password, user.Password))
-                return (false, "비밀번호가 일치하지 않습니다.", null, null);
+                return Problem("비밀번호가 일치하지 않습니다.", statusCode:400);
 
             string token = JwtHelper.GenerateJwtToken(user, _config);
 
@@ -81,24 +81,25 @@ namespace REST_API.UserService
             var msg = new MessageLogDTO { oper = 0, UserState = value };   // 0 : Login , 1 : Logout
             await _redis.Publish("user:state:update", JsonSerializer.Serialize(msg));
 
-            return (true, "로그인 성공", token, value);
+            return Ok(value);
         }
 
         [HttpPost("logout")]
-        public async Task<(bool Success, string Message)> LogoutAsync(HttpContext ctx)
+        public async Task<IActionResult> LogoutAsync()
         {
-            var auth = ctx.Request.Headers["Authorization"].ToString();
+            var auth = HttpContext.Request.Headers["Authorization"].ToString();
             var token = auth["Bearer ".Length..].Trim();
             if (string.IsNullOrEmpty(auth) || !auth.StartsWith("Bearer "))
-                return (false,"유효하지 않은 토큰 형식입니다.");
+                return Problem("유효하지 않은 토큰 형식입니다.",statusCode:401);
 
             var username = JwtHelper.ExtractUsernameFromJwt(token);
             if (username == null)
-                return (false, "토큰 파싱 실패.");
+                return Problem("잘못된 토큰입니다.",statusCode:401);
 
-            var cached = await _redis.GetAsync($"user:token:{username}");
-            if (cached != token)
-                return (false,"이미 만료되었거나 유효하지 않은 세션 입니다.");
+            var cached = await _redis.GetAsync($"user:state:{username}");
+            var dto = JsonSerializer.Deserialize<UserStateDTO>(cached);
+            if (dto == null || dto.Token != token)
+                return Problem("이미 만료되었거나 유효하지 않은 세션 입니다.",statusCode:404);
 
             await _redis.DeleteAsync($"user:state:{username}");
 
@@ -107,7 +108,7 @@ namespace REST_API.UserService
             string message = JsonSerializer.Serialize(msg);
             await _redis.Publish("user:state:update", message);
 
-            return (true, "로그아웃 완료");
+            return Ok("로그아웃 완료");
         }
 
     }

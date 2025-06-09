@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
-namespace REST_API.DBModel
+namespace REST_API.Entity
 {
     public class Dbconn : DbContext
     {

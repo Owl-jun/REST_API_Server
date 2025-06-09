@@ -1,5 +1,4 @@
 ﻿using REST_API.DTO;
-using REST_API.UserService;
 
 namespace REST_API.LocalCache
 {
