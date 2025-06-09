@@ -27,6 +27,10 @@ namespace REST_API.UserService
             _config = config;
         }
 
+        [ProducesResponseType(typeof(string), 200)]
+        [ProducesResponseType(typeof(ProblemDetails),400)]
+        [ProducesResponseType(typeof(ProblemDetails),409)]
+        [ProducesResponseType(typeof(ProblemDetails),500)]
         [HttpPost("reg")]
         public async Task<IActionResult> RegisterAsync(User user)
         {
@@ -56,6 +60,9 @@ namespace REST_API.UserService
             }
         }
 
+        [ProducesResponseType(typeof(UserStateDTO), 200)]
+        [ProducesResponseType(typeof(ProblemDetails),400)]
+        [ProducesResponseType(typeof(ProblemDetails),409)]
         [HttpPost("login")]
         public async Task<ActionResult<UserStateDTO>> LoginAsync(LoginRequestDTO req)
         {
@@ -84,6 +91,9 @@ namespace REST_API.UserService
             return Ok(value);
         }
 
+        [ProducesResponseType(typeof(string), 200)]
+        [ProducesResponseType(typeof(ProblemDetails),401)]
+        [ProducesResponseType(typeof(ProblemDetails),404)]
         [HttpPost("logout")]
         public async Task<IActionResult> LogoutAsync()
         {
