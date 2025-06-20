@@ -98,18 +98,25 @@ namespace REST_API.UserService
         public async Task<IActionResult> LogoutAsync()
         {
             var auth = HttpContext.Request.Headers["Authorization"].ToString();
-            var token = auth["Bearer ".Length..].Trim();
-            if (string.IsNullOrEmpty(auth) || !auth.StartsWith("Bearer "))
-                return Problem("유효하지 않은 토큰 형식입니다.",statusCode:401);
+
+            if (!HttpContext.Request.Headers.TryGetValue("Authorization", out var authHeader) ||
+                !authHeader.ToString().StartsWith("Bearer "))
+            {
+                return Problem("유효하지 않은 토큰 형식입니다.", statusCode: 401);
+            }
+
+            var token = authHeader.ToString()["Bearer ".Length..].Trim();
 
             var username = JwtHelper.ExtractUsernameFromJwt(token);
             if (username == null)
                 return Problem("잘못된 토큰입니다.",statusCode:401);
 
             var cached = await _redis.GetAsync($"user:state:{username}");
+
+            if (cached == null)
+                return Problem("로그아웃 상태이거나 세션이 없습니다.", statusCode: 404);
+
             var dto = JsonSerializer.Deserialize<UserStateDTO>(cached);
-            if (dto == null || dto.Token != token)
-                return Problem("이미 만료되었거나 유효하지 않은 세션 입니다.",statusCode:404);
 
             await _redis.DeleteAsync($"user:state:{username}");
 
