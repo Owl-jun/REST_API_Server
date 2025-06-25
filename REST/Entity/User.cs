@@ -11,7 +11,8 @@ namespace REST_API.Entity
         public int Age { get; set; }
         public string Phone { get; set; } = "";
         [JsonIgnore] public DateTime Created_At { get; set; } = DateTime.Now;
-
+        [JsonIgnore] public double posx { get; set; }
+        [JsonIgnore] public double posy { get; set; }
         [JsonIgnore] public List<Inventory> Inventory { get; set; } = new();
     }
 }
