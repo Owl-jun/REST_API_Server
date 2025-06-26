@@ -81,12 +81,12 @@ namespace REST_API.UserService
 
             string token = JwtHelper.GenerateJwtToken(user, _config);
 
-            var value = new UserStateDTO { Token = token, UserId = user.Id, UserName = user.Username };
+            var value = new UserStateDTO { Token = token, UserName = user.Username };
             await _redis.SetAsync($"user:state:{user.Username}", JsonSerializer.Serialize(value), TimeSpan.FromHours(1));
 
             // 동기화 메시지 전송
-            var msg = new MessageLogDTO { oper = 0, UserState = value };   // 0 : Login , 1 : Logout
-            await _redis.Publish("user:state:update", JsonSerializer.Serialize(msg));
+            //var msg = new MessageLogDTO { oper = 0, UserState = value };   // 0 : Login , 1 : Logout
+            //await _redis.Publish("user:state:update", JsonSerializer.Serialize(msg));
 
             return Ok(value);
         }
@@ -121,7 +121,7 @@ namespace REST_API.UserService
             await _redis.DeleteAsync($"user:state:{username}");
 
             // 동기화 메시지 전송
-            var msg = new MessageLogDTO { oper = 1, UserState = new UserStateDTO { UserName = username } };   // 0 : Login , 1 : Logout
+            var msg = new MessageLogDTO { oper = 1, UserState = new UserStateDTO { UserName = username , Token = token } };   // 0 : Login , 1 : Logout
             string message = JsonSerializer.Serialize(msg);
             await _redis.Publish("user:state:update", message);
 
