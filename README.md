@@ -111,15 +111,7 @@
 
 ## 남은 개발일정
 
-- REDIS 연동
-- 캐시 계층
-   - 프로세스 - Local Cache(hash map) - REDIS SERVER
-
-- 중복 로그인 방지
-   - 로그인요청 -> Local Cache 체크 -> REDIS Cache 체크
-      - 캐시 miss -> 로그인 로직
-      - 캐시 hit -> 강제 로그아웃 메시지
-      
+- [x] REDIS 연동
+- [x] 중복 로그인 방지
 - inventory 관련 API 메서드 구현
-
 - 캐시 동기화 관련 규칙
