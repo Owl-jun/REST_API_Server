@@ -34,6 +34,7 @@ namespace REST_API.UserService
         [HttpPost("reg")]
         public async Task<IActionResult> RegisterAsync(User user)
         {
+            using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
                 string hashed = BCrypt.Net.BCrypt.HashPassword(user.Password);
@@ -42,6 +43,8 @@ namespace REST_API.UserService
                 // DB 저장
                 _db.Users.Add(user);
                 await _db.SaveChangesAsync();
+
+                await transaction.CommitAsync();
 
                 return Ok("회원가입 완료");
             }
@@ -52,7 +55,8 @@ namespace REST_API.UserService
             }
             catch (DbUpdateException ex)
             {
-                return Problem("가입 실패" + ex.Message, statusCode: 400);
+                await transaction.RollbackAsync();
+                return StatusCode(500, "회원가입 실패");
             }
             catch (Exception ex)
             {
@@ -82,7 +86,8 @@ namespace REST_API.UserService
             string token = JwtHelper.GenerateJwtToken(user, _config);
 
             var value = new UserStateDTO { Token = token, UserName = user.Username };
-            await _redis.SetAsync($"user:state:{user.Username}", JsonSerializer.Serialize(value), TimeSpan.FromHours(1));
+            await _redis.SetAsync($"user:state:{user.Username}", 
+                JsonSerializer.Serialize(value), TimeSpan.FromHours(1));
 
             // 동기화 메시지 전송
             //var msg = new MessageLogDTO { oper = 0, UserState = value };   // 0 : Login , 1 : Logout
@@ -120,8 +125,10 @@ namespace REST_API.UserService
 
             await _redis.DeleteAsync($"user:state:{username}");
 
-            // 동기화 메시지 전송
-            var msg = new MessageLogDTO { oper = 1, UserState = new UserStateDTO { UserName = username , Token = token } };   // 0 : Login , 1 : Logout
+            // 동기화 메시지 전송         oper -> 0 : Login , 1 : Logout
+            var msg = new MessageLogDTO { oper = 1, UserState = new UserStateDTO { 
+                UserName = username , Token = token } 
+            };   
             string message = JsonSerializer.Serialize(msg);
             await _redis.Publish("user:state:update", message);
 
